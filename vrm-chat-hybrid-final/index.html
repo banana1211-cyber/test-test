@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ギャル風占い師VRMチャット</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .vrm-container {
+            flex: 1;
+            position: relative;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px 0 0 20px;
+            margin: 20px 0 20px 20px;
+        }
+
+        #vrm-canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px 0 0 20px;
+        }
+
+        .chat-container {
+            width: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 0 20px 20px 0;
+            margin: 20px 20px 20px 0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .chat-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            border-radius: 0 20px 0 0;
+            color: white;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+
+        .status-indicator.loading {
+            background: rgba(255, 193, 7, 0.9);
+            color: black;
+        }
+
+        .status-indicator.speaking {
+            background: rgba(40, 167, 69, 0.9);
+        }
+
+        .status-indicator.error {
+            background: rgba(220, 53, 69, 0.9);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(100vh - 200px);
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message.ai {
+            text-align: left;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .message.ai .message-content {
+            background: #f8f9fa;
+            color: #333;
+            border: 1px solid #e9ecef;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            background: white;
+            border-radius: 0 0 20px 0;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        #messageInput:focus {
+            border-color: #667eea;
+        }
+
+        #sendButton {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+
+        #sendButton:hover {
+            transform: translateY(-2px);
+        }
+
+        #sendButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading-indicator {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .loading-indicator.show {
+            display: block;
+        }
+
+        .emotion-indicator {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .vrm-container {
+                height: 60%;
+                border-radius: 20px 20px 0 0;
+                margin: 20px 20px 0 20px;
+            }
+            
+            #vrm-canvas {
+                border-radius: 20px 20px 0 0;
+            }
+            
+            .chat-container {
+                width: 100%;
+                height: 40%;
+                border-radius: 0 0 20px 20px;
+                margin: 0 20px 20px 20px;
+            }
+            
+            .chat-header {
+                border-radius: 0;
+            }
+            
+            .chat-input-container {
+                border-radius: 0 0 20px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="vrm-container">
+            <div class="status-indicator" id="statusIndicator">初期化中...</div>
+            <div class="emotion-indicator" id="emotionIndicator">😊 待機中</div>
+            <canvas id="vrm-canvas"></canvas>
+        </div>
+        
+        <div class="chat-container">
+            <div class="chat-header">
+                <h1>🔮 ギャル風占い師</h1>
+                <p>あなたの運勢を占うよ〜✨</p>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message ai">
+                    <div class="message-content">
+                        こんにちは〜！私、ギャル風占い師のアイちゃんだよ〜✨<br>
+                        タロット、星座占い、血液型、数秘術、なんでも占っちゃうから気軽に話しかけてね〜💕
+                    </div>
+                </div>
+            </div>
+            
+            <div class="loading-indicator" id="loadingIndicator">
+                占い師が考え中...🔮
+            </div>
+            
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <input type="text" id="messageInput" placeholder="何を占いたい？気軽に話しかけてね〜" maxlength="500">
+                    <button id="sendButton">送信</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js and VRM Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.0.7/lib/three-vrm.min.js"></script>
+
+    <script>
+        // グローバル変数
+        let scene, camera, renderer, vrm, mixer;
+        let isLoading = false;
+        let currentEmotion = 'neutral';
+        let audioContext, analyser;
+
+        // DOM要素
+        const statusIndicator = document.getElementById('statusIndicator');
+        const emotionIndicator = document.getElementById('emotionIndicator');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        // ステータス更新関数
+        function updateStatus(message, type = 'normal') {
+            statusIndicator.textContent = message;
+            statusIndicator.className = 'status-indicator';
+            if (type !== 'normal') {
+                statusIndicator.classList.add(type);
+            }
+            console.log(`[Status] ${message}`);
+        }
+
+        // 感情更新関数
+        function updateEmotion(emotion) {
+            currentEmotion = emotion;
+            const emotionMap = {
+                'happy': '😊 嬉しい',
+                'excited': '🤩 興奮',
+                'thinking': '🤔 考え中',
+                'surprised': '😲 驚き',
+                'neutral': '😌 普通',
+                'speaking': '🗣️ 話し中'
+            };
+            emotionIndicator.textContent = emotionMap[emotion] || '😊 待機中';
+        }
+
+        // VRMシーンの初期化
+        async function initVRMScene() {
+            try {
+                updateStatus('VRMシーンを初期化中...', 'loading');
+
+                // シーン、カメラ、レンダラーの設定
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                renderer = new THREE.WebGLRenderer({ 
+                    canvas: document.getElementById('vrm-canvas'),
+                    antialias: true,
+                    alpha: true
+                });
+                
+                const canvas = document.getElementById('vrm-canvas');
+                const rect = canvas.getBoundingClientRect();
+                renderer.setSize(rect.width, rect.height);
+                renderer.setClearColor(0x000000, 0);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+                // ライティング設定
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(1, 1, 1);
+                directionalLight.castShadow = true;
+                scene.add(directionalLight);
+
+                // カメラ位置設定
+                camera.position.set(0, 1.4, 2);
+                camera.lookAt(0, 1.4, 0);
+
+                // デフォルトVRMモデルの読み込み（サンプルモデル）
+                await loadVRMModel();
+
+                // アニメーションループ開始
+                animate();
+
+                updateStatus('VRM準備完了', 'normal');
+                
+            } catch (error) {
+                console.error('VRM初期化エラー:', error);
+                updateStatus('VRM初期化エラー', 'error');
+            }
+        }
+
+        // VRMモデル読み込み
+        async function loadVRMModel() {
+            try {
+                // サンプルVRMモデルのURL（実際のプロジェクトでは適切なVRMファイルを使用）
+                const vrmUrl = 'https://cdn.jsdelivr.net/gh/pixiv/three-vrm@dev/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm';
+                
+                const loader = new THREE.GLTFLoader();
+                const gltf = await new Promise((resolve, reject) => {
+                    loader.load(vrmUrl, resolve, undefined, reject);
+                });
+
+                const vrmData = await THREE_VRM.VRMLoaderPlugin.parseVRM(gltf);
+                vrm = vrmData.vrm;
+                
+                // VRMをシーンに追加
+                scene.add(vrm.scene);
+                
+                // アニメーションミキサーの設定
+                mixer = new THREE.AnimationMixer(vrm.scene);
+
+                console.log('VRMモデル読み込み完了');
+                
+            } catch (error) {
+                console.error('VRMモデル読み込みエラー:', error);
+                // フォールバック: シンプルなキューブを表示
+                const geometry = new THREE.BoxGeometry(1, 2, 1);
+                const material = new THREE.MeshLambertMaterial({ color: 0xff69b4 });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.y = 1;
+                scene.add(cube);
+                console.log('フォールバック表示: キューブ');
+            }
+        }
+
+        // アニメーションループ
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (mixer) {
+                mixer.update(0.016); // 60fps
+            }
+            
+            if (vrm) {
+                vrm.update(0.016);
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // ウィンドウリサイズ対応
+        function onWindowResize() {
+            const canvas = document.getElementById('vrm-canvas');
+            const rect = canvas.getBoundingClientRect();
+            camera.aspect = rect.width / rect.height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(rect.width, rect.height);
+        }
+
+        // チャットメッセージ追加
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = content.replace(/\n/g, '<br>');
+            
+            messageDiv.appendChild(contentDiv);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // ChatGPT APIへのリクエスト
+        async function sendToChatGPT(message) {
+            try {
+                updateStatus('占い師に相談中...', 'loading');
+                updateEmotion('thinking');
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        conversation_history: getConversationHistory()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStatus('占い完了', 'normal');
+                    updateEmotion('happy');
+                    return data.response;
+                } else {
+                    throw new Error(data.error || '占いに失敗しました');
+                }
+                
+            } catch (error) {
+                console.error('ChatGPT API Error:', error);
+                updateStatus('占いエラー', 'error');
+                updateEmotion('neutral');
+                return 'ごめんね〜、今ちょっと占いの調子が悪いみたい💦 もう一度試してみて〜';
+            }
+        }
+
+        // 会話履歴取得
+        function getConversationHistory() {
+            const messages = chatMessages.querySelectorAll('.message');
+            const history = [];
+            
+            messages.forEach(msg => {
+                const isUser = msg.classList.contains('user');
+                const content = msg.querySelector('.message-content').textContent;
+                history.push({
+                    role: isUser ? 'user' : 'assistant',
+                    content: content
+                });
+            });
+            
+            return history.slice(-10); // 最新10件のみ
+        }
+
+        // テキストから感情を検出
+        function detectEmotionFromText(text) {
+            const lowerText = text.toLowerCase();
+            
+            // 興奮・嬉しい
+            if (lowerText.includes('やばい') || lowerText.includes('すごい') || 
+                lowerText.includes('最高') || lowerText.includes('✨') ||
+                lowerText.includes('！！') || lowerText.includes('!!')) {
+                return 'excited';
+            }
+            
+            // 嬉しい
+            if (lowerText.includes('嬉しい') || lowerText.includes('良い') || 
+                lowerText.includes('いいね') || lowerText.includes('💕') ||
+                lowerText.includes('😊') || lowerText.includes('ラッキー')) {
+                return 'happy';
+            }
+            
+            // 考え中
+            if (lowerText.includes('うーん') || lowerText.includes('そうね') || 
+                lowerText.includes('考え') || lowerText.includes('🤔') ||
+                lowerText.includes('どうかな') || lowerText.includes('見てみる')) {
+                return 'thinking';
+            }
+            
+            // 驚き
+            if (lowerText.includes('えー') || lowerText.includes('まじ') || 
+                lowerText.includes('びっくり') || lowerText.includes('😲') ||
+                lowerText.includes('そうなの') || lowerText.includes('へー')) {
+                return 'surprised';
+            }
+            
+            return 'neutral';
+        }
+
+        // 音声合成（/api/speak経由でにじボイス対応）
+        async function speakText(text, emotion = 'neutral') {
+            try {
+                updateEmotion('speaking');
+                
+                // /api/speakを呼び出し
+                const response = await fetch('/api/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, emotion: emotion })
+                });
+                
+                // 1) にじボイス：audio_urlが返る場合
+                if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
+                    const data = await response.json();
+                    
+                    if (data.success && data.method === 'nijivoice' && data.audio_url) {
+                        console.log('にじボイス音声を再生');
+                        const audio = new Audio(data.audio_url);
+                        
+                        audio.onended = () => {
+                            updateEmotion('neutral');
+                        };
+                        
+                        await audio.play();
+                        return;
+                    }
+                    
+                    // 2) フォールバック：Web Speechのパラメータが返る場合
+                    if (data.method === 'web_speech' && data.voice_params) {
+                        console.log('Web Speech APIを使用（パラメータ付き）');
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        
+                        // APIから返されたパラメータを適用
+                        Object.assign(utterance, data.voice_params);
+                        
+                        utterance.onend = () => {
+                            updateEmotion('neutral');
+                        };
+                        
+                        speechSynthesis.cancel();
+                        speechSynthesis.speak(utterance);
+                        return;
+                    }
+                }
+                
+                // 3) 最後の砦：標準Web Speech API
+                console.log('標準Web Speech APIを使用');
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'ja-JP';
+                    utterance.rate = 1.1;
+                    utterance.pitch = 1.2;
+                    
+                    utterance.onend = () => {
+                        updateEmotion('neutral');
+                    };
+                    
+                    speechSynthesis.speak(utterance);
+                } else {
+                    console.log('音声合成未対応');
+                    updateEmotion('neutral');
+                }
+                
+            } catch (error) {
+                console.error('音声合成エラー:', error);
+                
+                // エラー時のフォールバック
+                if ('speechSynthesis' in window) {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'ja-JP';
+                    speechSynthesis.speak(utterance);
+                }
+                
+                updateEmotion('neutral');
+            }
+        }
+
+        // メッセージ送信
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isLoading) return;
+
+            console.log('ユーザー:', message);
+            
+            // ユーザーメッセージを表示
+            addMessage(message, true);
+            messageInput.value = '';
+            
+            // ローディング状態
+            isLoading = true;
+            sendButton.disabled = true;
+            loadingIndicator.classList.add('show');
+            
+            try {
+                // ChatGPT APIに送信
+                const response = await sendToChatGPT(message);
+                
+                // AIの応答を表示
+                addMessage(response, false);
+                
+                // 音声合成（感情を考慮）
+                const detectedEmotion = detectEmotionFromText(response);
+                await speakText(response, detectedEmotion);
+                
+            } catch (error) {
+                console.error('送信エラー:', error);
+                addMessage('ごめんね〜、エラーが発生しちゃった💦', false);
+            } finally {
+                // ローディング状態解除
+                isLoading = false;
+                sendButton.disabled = false;
+                loadingIndicator.classList.remove('show');
+            }
+        }
+
+        // イベントリスナー設定
+        function setupEventListeners() {
+            // 送信ボタン
+            sendButton.addEventListener('click', sendMessage);
+            
+            // Enterキー送信
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+            
+            // ウィンドウリサイズ
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // sendMessage関数をグローバルに登録
+        window.sendMessage = sendMessage;
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('VRMチャットアプリ初期化開始');
+            
+            setupEventListeners();
+            await initVRMScene();
+            
+            updateStatus('準備完了 - 話しかけてね〜', 'normal');
+            updateEmotion('neutral');
+            
+            console.log('初期化完了');
+        });
+    </script>
+</body>
+</html>
+
